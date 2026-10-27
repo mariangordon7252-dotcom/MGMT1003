@@ -165,6 +165,14 @@ details.pass summary b{color:var(--ok)}
 .wd b{font-weight:600;margin-right:8px}
 .kv .wd b{display:inline;font-size:14px;color:var(--tx);margin:0 8px 0 0}
 .kv .wds{white-space:normal}
+details.fold{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+details.fold>summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;padding:9px 12px;font-size:14px;font-weight:600;color:var(--tx2)}
+details.fold>summary::-webkit-details-marker{display:none}
+.fchev{display:inline-flex;color:var(--tx3);transition:transform .2s;transform:rotate(90deg)}
+.fchev svg{width:16px;height:16px}
+details.fold[open] .fchev{transform:rotate(-90deg)}
+.fbody{padding:0 8px 8px}
+.fbody .wd b{display:inline;font-size:14px;color:var(--tx);margin:0 8px 0 0}
 .wd i{display:block;font-style:normal;color:var(--tx3);font-size:13px}
 .ktitle{font-size:21px;font-weight:600;line-height:1.35;margin-top:8px}
 .ktitle small{display:block;font-size:14px;font-weight:400;color:var(--tx3);margin-top:2px}
@@ -12493,7 +12501,7 @@ function cardBody(c, o = {}){
   ${c.formula ? `<div class="kc-sec"><h4>公式</h4><pre class="work" style="margin:0">${esc(c.formula)}</pre></div>` : ''}
   ${anaBlock(c)}
   ${c.kTrap ? `<div class="trap"><b>⚠️ 易错</b>${fmt(c.kTrap)}</div>` : ''}
-  ${c.words && c.words.length ? `<div class="kc-sec"><h4>题目里会出现的词</h4><div class="wds">${c.words.map(wordRow).join('')}</div></div>` : ''}
+  ${c.words && c.words.length ? fold('kword', '题目里会出现的词', c.words.length, `<div class="wds">${c.words.map(wordRow).join('')}</div>`) : ''}
   ${symBlock(c)}${mine}
   <details class="more"><summary>英文定义（写短定义题用）▾</summary>${c.en ? `<div class="en" style="margin-top:6px">${fmt(c.en)}</div>` : ''}<div class="kv"><b>Definition</b><div>${fmt(c.def)}</div></div></details>
   ${o.noPractice ? '' : kpBtn(c)}</div>`;
@@ -12552,14 +12560,18 @@ function symsIn(key, t){
 }
 const symsOf = c => symsIn(c.id, (c.pts ? [c.one, ...c.pts, c.ex, c.formula, c.kTrap] : [c.term, c.one, c.en, c.formula, c.def, c.defZh, c.example, c.pitfall]).filter(Boolean).join('\n'));
 const symRow = x => `<code>${esc(x.s)}</code><div>${esc(x.m)}<div class="mut">读法：${esc(x.r)}</div></div>`;
+/* 可折叠区块：默认收起；同一类区块展开/收起后，翻到下一题保持不变 */
+const foldOpen = {};
+const fold = (k, title, n, body) => `<details class="fold" data-fold="${k}" ${foldOpen[k] ? 'open' : ''}><summary><span class="sp">${title}</span><span class="mut">${n} 个</span><span class="fchev">${IC.chev}</span></summary><div class="fbody">${body}</div></details>`;
+document.addEventListener('toggle', e => { const d = e.target; if (d.dataset && d.dataset.fold) foldOpen[d.dataset.fold] = d.open; }, true);
 function symBlock(c){
   const xs = symsOf(c);
-  return xs.length ? `<div class="kv"><b>符号</b><div class="syms">${xs.map(symRow).join('')}</div></div>` : '';
+  return xs.length ? fold('ksym', '符号', xs.length, `<div class="syms">${xs.map(symRow).join('')}</div>`) : '';
 }
 /* 练习题下方：只标这道题里出现的符号（模拟考不显示） */
 function qSymBlock(key, text){
   const xs = symsIn(key, text);
-  return xs.length ? `<div class="kv" style="margin-top:12px"><b>题中符号</b><div class="syms">${xs.map(symRow).join('')}</div></div>` : '';
+  return xs.length ? fold('qsym', '题中符号', xs.length, `<div class="syms">${xs.map(symRow).join('')}</div>`) : '';
 }
 function symPanel(){
   const row = symRow;
@@ -12576,7 +12588,7 @@ function qWordBlock(key, text){
       if (alt.length) WORDS.push({...w, re: new RegExp('\\b(' + alt.join('|') + ')\\b', 'i')}); } })); }
   if (!symCache['w' + key]) symCache['w' + key] = WORDS.filter(w => w.re.test(text));
   const xs = symCache['w' + key];
-  return xs.length ? `<div class="kv" style="margin-top:12px"><b>题中词汇</b><div class="wds">${xs.map(wordRow).join('')}</div></div>` : '';
+  return xs.length ? fold('qword', '题中词汇', xs.length, `<div class="wds">${xs.map(wordRow).join('')}</div>`) : '';
 }
 const anaBlock = c => c.ana ?`<div class="ana"><b>💡 打个比方</b>${fmt(c.ana)}</div>` : '';
 const kTitle = c => c.zh ? `<div class="ktitle">${esc(c.zh)}<small>${esc(c.term)}</small></div>` : `<div class="ktitle">${esc(c.term)}</div>`;
