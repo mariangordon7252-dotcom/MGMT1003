@@ -197,6 +197,8 @@ details.pass summary b{color:var(--ok)}
 .go-t{font-weight:600;line-height:1.6}
 .list .it.cram{align-items:flex-start;line-height:1.55;font-size:14.5px}
 .list .it.cram b{font-weight:600}
+.chip.hfchip{border-color:var(--warn);color:var(--warn)}
+.chip.hfchip.on{background:var(--warn);border-color:var(--warn);color:var(--onacc)}
 .go-mini{display:block;margin-top:2px;color:var(--tx)}
 .lx{margin-top:16px;border:1px solid var(--acc);border-radius:12px;padding:10px 14px;background:var(--card)}
 .lx>b{display:block;font-size:12.5px;font-weight:600;color:var(--acc);margin-bottom:4px}
@@ -13094,7 +13096,7 @@ SCR.home = () => {
   </div>
   <button class="btn block" data-act="go" data-n="plan">查看 12 天完整计划</button>
   <h2>专项复习</h2>
-  ${cramTile()}${ttTile()}`;
+  ${hfTile()}${cramTile()}${ttTile()}`;
 };
 // 真值表专区入口：首页、练习、知识库都放一个
 const ttTile = () => { const les = S.tt.les || {}, nr = Object.keys(les).length;
@@ -13737,30 +13739,38 @@ SCR.kp = p => {
 
 /* ----- 秒判速查：所有知识点的考法一页看完 ----- */
 SCR.cram = p => {
-  const m = p.m || 'prob', cs = CARDS.filter(c => c.module === m && c.go);
+  const m = p.m || 'prob', cs = hfCards(CARDS.filter(c => c.module === m && c.go));
   const lecs = [...new Set(cs.map(c => c.lecture))].sort((a, b) => lecNum(a) - lecNum(b));
   return hdr('🎯 秒判速查') + `<p class="sub">每个知识点只留一句「看到什么 → 怎么答」。考前过一遍，点名称看完整卡片。</p>
   <div class="seg">${MOD_ORDER.map(k => `<button class="${m === k ? 'on' : ''}" data-act="cramMod" data-m="${k}">${MODS[k].name}</button>`).join('')}</div>
+  <div class="chips" style="margin-top:-4px">${hfChip()}</div>
   ${lecs.map(l => `<h2>${l} <span class="mut" style="font-weight:400">${esc(LEC[l] || '')}</span></h2><div class="card list">${cs.filter(c => c.lecture === l).map(c => `<button class="it cram" data-act="kpOpen" data-id="${c.id}"><span class="sp"><b>${esc(c.zh || c.term)}</b><span class="mut"> · ${fmt(c.go.kind)}</span><br>${fmt(c.go.tip)}</span><span class="chev">${IC.chev}</span></button>`).join('')}</div>`).join('')}`;
 };
 const cramTile = () => `<button class="tile" data-act="go" data-n="cram"><span class="ic">${IC.alert}</span><span class="sp"><b>🎯 秒判速查</b><span class="mut">全部知识点的「看到什么 → 怎么答」，一页过完</span></span><span class="chev">${IC.chev}</span></button>`;
 
 /* ----- 按 Lecture 专项复习 ----- */
-const lecCards = l => CARDS.filter(c => c.lecture === l);
-SCR.lecList = () => hdr('按 Lecture 专项复习') + `<p class="sub">选一讲，一张一张过知识点，左右滑动切换。</p>` +
-  LECS.filter(l => lecCards(l).length).map(l => { const cs = lecCards(l), got = cs.filter(kpPass).length, ms = [...new Set(cs.map(c => c.module))];
+// 「只看高频」是一个全局开关：知识库、按讲复习、秒判速查共用，存在 S.hfOnly 里
+const lecCards = l => CARDS.filter(c => l === '*' ? c.hf : c.lecture === l);   // '*' = 全部讲次的高频知识点
+const hfCards = cs => S.hfOnly ? cs.filter(c => c.hf) : cs;
+const hfChip = () => `<button class="chip hfchip ${S.hfOnly ? 'on' : ''}" data-act="hfToggle">⭐ 只看高频</button>`;
+const hfTile = () => { const cs = CARDS.filter(c => c.hf), got = cs.filter(kpPass).length;
+  return `<button class="tile tthl" data-act="deckGo" data-l="*"><span class="ic">⭐</span><span class="sp"><b>高频知识点速通</b><span class="mut">只过最常考的 ${cs.length} 个（共 ${CARDS.length} 个），已通过 ${got}。时间紧就先刷这些</span></span><span class="chev">${IC.chev}</span></button>`; };
+SCR.lecList = () => hdr('按 Lecture 专项复习') + `<p class="sub">选一讲，一张一张过知识点，左右滑动切换。</p>${hfTile()}<div class="chips">${hfChip()}</div>` +
+  LECS.filter(l => lecCards(l).length).map(l => { const cs = lecCards(l), got = cs.filter(kpPass).length, ms = [...new Set(cs.map(c => c.module))], nh = cs.filter(c => c.hf).length;
     return `<button class="tile lecit" data-act="deckGo" data-l="${l}"><span class="sp" style="display:block"><b>${l} · ${esc(LEC[l] || '')}</b>
-    <span class="row" style="gap:6px;margin-top:3px">${ms.map(pill).join('')}<span class="mut">${cs.length} 个知识点 · 已通过 ${got}</span></span>
+    <span class="row" style="gap:6px;margin-top:3px;flex-wrap:wrap">${ms.map(pill).join('')}<span class="mut">${S.hfOnly ? `高频 ${nh} 个（共 ${cs.length}）` : `${cs.length} 个知识点 · 高频 ${nh}`} · 已通过 ${got}</span></span>
     <span class="bar" style="display:block"><i style="width:${got / cs.length * 100}%;background:var(--ok)"></i></span></span><span class="chev">${IC.chev}</span></button>`; }).join('');
-function deckList(p){ const all = lecCards(p.l); return {all, list: p.todo ? all.filter(c => !kpPass(c)) : all}; }
+function deckList(p){ const all = hfCards(lecCards(p.l)); return {all, list: p.todo ? all.filter(c => !kpPass(c)) : all}; }
 SCR.deck = p => {
   const {all, list} = deckList(p), todo = all.filter(c => !kpPass(c)).length;
-  const head = hdr(`${p.l} · ${esc(LEC[p.l] || '')}`, list.length ? `<span class="mut">${Math.min(p.i, list.length - 1) + 1}/${list.length}</span>` : '') +
-    `<div class="chips" style="margin:0 0 8px"><button class="chip ${p.todo ? '' : 'on'}" data-act="deckTodo" data-v="">全部 ${all.length}</button><button class="chip ${p.todo ? 'on' : ''}" data-act="deckTodo" data-v="1">只看未通过 ${todo}</button></div>`;
-  if (!list.length) return head + `<p class="empty">这一讲的知识点都通过了 🎉</p><button class="btn block" data-act="deckTodo" data-v="">看全部知识点</button>`;
+  const title = p.l === '*' ? '⭐ 高频知识点速通' : `${p.l} · ${esc(LEC[p.l] || '')}`;
+  const head = hdr(title, list.length ? `<span class="mut">${Math.min(p.i, list.length - 1) + 1}/${list.length}</span>` : '') +
+    `<div class="chips" style="margin:0 0 8px"><button class="chip ${p.todo ? '' : 'on'}" data-act="deckTodo" data-v="">全部 ${all.length}</button><button class="chip ${p.todo ? 'on' : ''}" data-act="deckTodo" data-v="1">只看未通过 ${todo}</button>${p.l === '*' ? '' : hfChip()}</div>`;
+  if (!all.length) return head + `<p class="empty">这一讲没有高频知识点</p><button class="btn block" data-act="hfToggle">看这一讲全部知识点</button>`;
+  if (!list.length) return head + `<p class="empty">${p.l === '*' || S.hfOnly ? '高频知识点' : '这一讲的知识点'}都通过了 🎉</p><button class="btn block" data-act="deckTodo" data-v="">看全部知识点</button>`;
   const i = p.i = Math.max(0, Math.min(p.i || 0, list.length - 1)), c = list[i], ok = kpPass(c), pr = kpProg(c), last = i === list.length - 1;
   return head + `<div class="dots">${list.map((x, k) => `<i class="${kpPass(x) ? 'ok' : ''} ${k === i ? 'cur' : ''}"></i>`).join('')}</div>
-  <div id="deck" class="card"><div class="row" style="gap:6px;flex-wrap:wrap">${pill(c.module)} ${c.hf ? '<span class="pill hf">高频</span>' : ''}<span class="sp"></span>${!ok && pr.n ? `<span class="kpn">${pr.ok}/${pr.n} 题</span>` : ''}<button class="kptick ${ok ? 'on' : ''}" data-act="kpTick" data-id="${c.id}" aria-label="标记掌握">✓</button></div>
+  <div id="deck" class="card"><div class="row" style="gap:6px;flex-wrap:wrap">${pill(c.module)} ${c.hf ? '<span class="pill hf">高频</span>' : ''}${p.l === '*' ? lecPill(c.lecture) : ''}<span class="sp"></span>${!ok && pr.n ? `<span class="kpn">${pr.ok}/${pr.n} 题</span>` : ''}<button class="kptick ${ok ? 'on' : ''}" data-act="kpTick" data-id="${c.id}" aria-label="标记掌握">✓</button></div>
   ${kTitle(c)}
   ${cardBody(c)}</div>
   <div class="decknav"><button class="btn" data-act="deckStep" data-d="-1" ${i === 0 ? 'disabled' : ''}>‹ 上一个</button>${last ? '<button class="btn pri" data-act="back">完成</button>' : '<button class="btn pri" data-act="deckStep" data-d="1">下一个 ›</button>'}</div>
@@ -13789,20 +13799,20 @@ let kb = {mod:'prob', q:'', open:{}, f:'all'};
 SCR.kb = () => {
   const all = CARDS.filter(kpPass).length, cs = CARDS.filter(c => c.module === kb.mod), got = cs.filter(kpPass).length;
   return `<h1>📚 知识库</h1><p class="sub">${CARDS.length} 个知识点 · 已通过 <b class="good">${all}</b>。对应的题全部答对自动变绿，也可以点右边圆圈手动打勾。</p>
-  ${cramTile()}${ttTile()}
+  ${hfTile()}${cramTile()}${ttTile()}
   <button class="tile" data-act="go" data-n="lecList"><span class="ic">${IC.dots}</span><span class="sp"><b>按 Lecture 专项复习</b><span class="mut">选一讲，一张一张左右滑动过知识点</span></span><span class="chev">${IC.chev}</span></button>
   <input type="search" id="kbq" placeholder="搜索：Bayes、Gettier、De Morgan…" value="${esc(kb.q)}" style="margin:2px 0 10px">
   <div class="seg">${MOD_ORDER.map(m => `<button class="${kb.mod === m ? 'on' : ''}" data-act="kbMod" data-m="${m}">${MODS[m].name} ${MODS[m].w}%</button>`).join('')}</div>
   <div class="row"><span class="mut sp">${MODS[kb.mod].name}已通过 ${got}/${cs.length}</span></div>
   <div class="bar" style="margin-top:4px"><i style="width:${cs.length ? got / cs.length * 100 : 0}%;background:var(--ok)"></i></div>
-  <div class="chips" style="margin-top:0">${[['all', '全部'], ['todo', '未通过'], ['done', '已通过']].map(([v, t]) => `<button class="chip ${kb.f === v ? 'on' : ''}" data-act="kbFilter" data-v="${v}">${t}</button>`).join('')}</div>
+  <div class="chips" style="margin-top:0">${[['all', '全部'], ['todo', '未通过'], ['done', '已通过']].map(([v, t]) => `<button class="chip ${kb.f === v ? 'on' : ''}" data-act="kbFilter" data-v="${v}">${t}</button>`).join('')}${hfChip()}</div>
   <div id="kbList">${kbList()}</div>`;
 };
 function kbList(){
   const q = kb.q.trim().toLowerCase();
   const cs = CARDS.filter(c => q ? [c.term, c.zh, c.one, c.en, c.def, c.defZh, c.example, ...(c.pts || []), c.ex, ...(c.words || []).map(w => w.en + ' ' + w.zh)].join(' ').toLowerCase().includes(q) : c.module === kb.mod)
-    .filter(c => kb.f === 'all' || (kb.f === 'done') === kpPass(c));
-  if (!cs.length) return `<p class="empty">${kb.f === 'done' ? '还没有通过的知识点' : kb.f === 'todo' ? '这里的知识点都通过了 🎉' : '没有找到'}</p>`;
+    .filter(c => kb.f === 'all' || (kb.f === 'done') === kpPass(c)).filter(c => !S.hfOnly || c.hf);
+  if (!cs.length) return `<p class="empty">${kb.f === 'done' ? '还没有通过的知识点' : kb.f === 'todo' ? '这里的知识点都通过了 🎉' : '没有找到'}${S.hfOnly ? '（当前只看高频）' : ''}</p>`;
   const g = {};
   cs.forEach(c => (g[c.lecture] = g[c.lecture] || []).push(c));
   return Object.keys(g).sort((a, b) => lecNum(a) - lecNum(b)).map(l => `<div class="row" style="margin:22px 0 10px"><h2 class="sp" style="font-size:15px;margin:0">${esc(l)} · ${esc(LEC[l] || '')}</h2><button class="btn sm" data-act="deckGo" data-l="${l}">专项复习 ›</button></div><div class="card list" style="padding-top:2px;padding-bottom:2px">` +
@@ -14014,6 +14024,7 @@ const ACT = {
     save(); render(); },
   kbFilter: d => { kb.f = d.v; render(); },
   cramMod: d => { cur().p.m = d.m; render(true); },
+  hfToggle: () => { S.hfOnly = !S.hfOnly; save(); if (cur().name === 'deck') cur().p.i = 0; render(); toast(S.hfOnly ? '⭐ 只看高频：其他知识点先跳过' : '已显示全部知识点'); },
   deckGo: d => go('deck', {l: d.l, i: 0}),
   deckStep: d => deckMove(+d.d),
   deckTodo: d => { const p = cur().p; p.todo = !!d.v; p.i = 0; render(true); },
